@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mariam - My Queen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,700&family=Quicksand:wght@300;500&display=swap');
+
+        :root {
+            --gold: #D4AF37;
+            --rose: #FFB7C5;
+            --crimson: #900C3F;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050005;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+        }
+
+        #overlay {
+            position: absolute; inset: 0;
+            background: radial-gradient(circle at center, #1a000a 0%, #000 100%);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; cursor: pointer; transition: opacity 1.5s ease-in-out;
+        }
+
+        .intro-card { 
+            text-align: center; 
+            color: #fff; 
+            font-family: 'Playfair Display', serif;
+            animation: fadeIn 2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .btn-elegant {
+            margin-top: 30px; padding: 16px 50px;
+            background: rgba(212, 175, 55, 0.05); 
+            border: 1px solid var(--gold);
+            color: var(--gold); font-size: 1.1rem;
+            letter-spacing: 5px; text-transform: uppercase;
+            cursor: pointer; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: auto;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-elegant:hover {
+            background: var(--gold); color: #000;
+            box-shadow: 0 0 50px rgba(212, 175, 55, 0.4);
+            transform: translateY(-3px);
+        }
+
+        #main-message {
+            font-family: 'Playfair Display', serif;
+            font-style: italic; color: #fff;
+            font-size: clamp(1.5rem, 8vw, 3rem); 
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 3s cubic-bezier(0.16, 1, 0.3, 1);
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            margin-top: -25vh;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .visible { opacity: 1 !important; transform: translateY(0) !important; }
+        
+        #music-control {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 150;
+            background: rgba(212, 175, 55, 0.15);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        #music-control:active { transform: scale(0.9); }
+
+        .sparkle-hint {
+            position: absolute;
+            bottom: 10%;
+            color: var(--gold);
+            font-family: 'Quicksand', sans-serif;
+            letter-spacing: 2px;
+            opacity: 0.5;
+            font-size: 0.8rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" loop>
+        <source src="music.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="overlay" onclick="startExperience()">
+        <div class="intro-card">
+            <h1 class="text-5xl md:text-8xl mb-4 font-light italic">For Mariam</h1>
+            <p class="text-gold-200 opacity-60 italic tracking-[0.5em] text-xs md:text-sm uppercase">The Queen of my Heart</p>
+            <button class="btn-elegant">Reveal Magic</button>
+        </div>
+        <div class="sparkle-hint">TAP TO BEGIN</div>
+    </div>
+
+    <button id="music-control" onclick="toggleMusic()">🎵</button>
+
+    <div id="ui-layer">
+        <h2 id="main-message">You are the light of my life, Mariam... ❤️</h2>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const overlay = document.getElementById('overlay');
+        const message = document.getElementById('main-message');
+        const audio = document.getElementById('bg-music');
+        const musicBtn = document.getElementById('music-control');
+
+        let width, height;
+        let particles = [];
+        let stars = [];
+        let state = 'idle';
+        let isMusicPlaying = false;
+        const HEART_PARTICLE_COUNT = 6000; 
+
+        const colors = {
+            gold: '#D4AF37',
+            rose: '#FFB7C5',
+            crimson: '#900C3F',
+            brightRed: '#FF1E1E',
+            highlight: '#FFE4E1'
+        };
+
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            createStars();
+        }
+
+        function createStars() {
+            stars = [];
+            for(let i=0; i<150; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 1.5,
+                    opacity: Math.random(),
+                    speed: 0.005 + Math.random() * 0.01
+                });
+            }
+        }
+
+        window.addEventListener('resize', init);
+        init();
+
+        class Particle {
+            constructor(x, y, color, targetX, targetY) {
+                this.x = x; this.y = y;
+                this.color = color;
+                this.targetX = targetX; this.targetY = targetY;
+                this.baseX = x; this.baseY = y;
+                // Control points for Bezier curve path
+                this.cp1x = x + (Math.random() - 0.5) * 600;
+                this.cp1y = y + (Math.random() - 0.5) * 600;
+                this.progress = 0;
+                this.speed = 0.008 + Math.random() * 0.015;
+                this.radius = Math.random() * 1.5 + 0.5;
+                this.alpha = 1;
+                this.isFading = false;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = (Math.random() - 0.5) * 10;
+                this.zOffset = Math.random() * 100;
+            }
+
+            resetTarget(tx, ty, newColor, isHeart = false) {
+                this.baseX = this.x; this.baseY = this.y;
+                this.targetX = tx; this.targetY = ty;
+                this.color = newColor;
+                this.cp1x = this.x + (Math.random() - 0.5) * 400;
+                this.cp1y = this.y + (Math.random() - 0.5) * 400;
+                this.progress = 0;
+                this.speed = isHeart ? 0.012 + Math.random() * 0.01 : 0.008 + Math.random() * 0.012;
+            }
+
+            update() {
+                if (this.isFading) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.alpha -= 0.015;
+                    return;
+                }
+                if (this.progress < 1) {
+                    this.progress += this.speed;
+                    const t = this.progress;
+                    // Ease out cubic
+                    const t1 = 1 - Math.pow(1 - t, 3);
+                    this.x = (1 - t1) ** 2 * this.baseX + 2 * (1 - t1) * t1 * this.cp1x + t1 ** 2 * this.targetX;
+                    this.y = (1 - t1) ** 2 * this.baseY + 2 * (1 - t1) * t1 * this.cp1y + t1 ** 2 * this.targetY;
+                } else if (state === 'morphing') {
+                    // Brownian-like subtle motion for the heart
+                    this.x += Math.sin(Date.now() * 0.002 + this.zOffset) * 0.2;
+                    this.y += Math.cos(Date.now() * 0.002 + this.zOffset) * 0.2;
+                }
+            }
+        }
+
+        function get3DHeartPoints(count) {
+            const points = [];
+            const scale = Math.min(width, height) / 22;
+            for (let i = 0; i < count; i++) {
+                const t = Math.random() * Math.PI * 2;
+                const r = 0.5 + Math.random() * 0.5;
+                
+                // Classic heart formula
+                const x = 16 * Math.pow(Math.sin(t), 3);
+                const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+                
+                // Add some "volume" by jittering based on a second random factor
+                const depth = (Math.random() - 0.5) * 2; 
+                
+                const px = (x * r) * scale + width / 2;
+                const py = (y * r) * scale + height / 2 + 60;
+                
+                // Color grading based on position
+                const dist = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+                let color = colors.crimson;
+                if (dist < 10) color = colors.brightRed;
+                if (dist < 5) color = colors.rose;
+                if (Math.random() > 0.98) color = colors.highlight;
+
+                points.push({ x: px, y: py, color: color });
+            }
+            return points;
+        }
+
+        function getTextPoints(text) {
+            const points = [];
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = width; tempCanvas.height = height;
+            
+            const fontSize = Math.min(width / 6, 180);
+            tempCtx.font = `900 ${fontSize}px 'Playfair Display'`;
+            tempCtx.textAlign = 'center';
+            tempCtx.textBaseline = 'middle';
+            tempCtx.fillStyle = 'white';
+            tempCtx.fillText(text, width / 2, height / 2);
+            
+            const data = tempCtx.getImageData(0, 0, width, height).data;
+            const step = width < 600 ? 4 : 6; // Denser for mobile
+            
+            for (let y = 0; y < height; y += step) {
+                for (let x = 0; x < width; x += step) {
+                    if (data[(y * width + x) * 4 + 3] > 128) {
+                        points.push({ x, y });
+                    }
+                }
+            }
+            return points;
+        }
+
+        function startExperience() {
+            if (state !== 'idle') return;
+            overlay.style.opacity = '0';
+            
+            // Try playing audio
+            audio.play().then(() => {
+                isMusicPlaying = true;
+                musicBtn.style.display = 'flex';
+                musicBtn.innerText = '🎵';
+            }).catch(() => {
+                musicBtn.style.display = 'flex';
+                musicBtn.innerText = '🔇';
+            });
+
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                launchSequence();
+            }, 1500);
+        }
+
+        function toggleMusic() {
+            if (isMusicPlaying) {
+                audio.pause(); musicBtn.innerText = '🔇';
+            } else {
+                audio.play(); musicBtn.innerText = '🎵';
+            }
+            isMusicPlaying = !isMusicPlaying;
+        }
+
+        function launchSequence() {
+            state = 'rising';
+            let py = height;
+            const px = width / 2;
+            
+            // Launch a "flare" upwards
+            const interval = setInterval(() => {
+                ctx.fillStyle = '#050005';
+                ctx.fillRect(0,0,width,height);
+                
+                // Draw rising flare
+                const grad = ctx.createRadialGradient(px, py, 0, px, py, 20);
+                grad.addColorStop(0, 'white');
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.arc(px, py, 15, 0, Math.PI*2); ctx.fill();
+                
+                py -= 12;
+                if(py <= height/2) {
+                    clearInterval(interval);
+                    triggerName();
+                }
+            }, 16);
+            requestAnimationFrame(animate);
+        }
+
+        function triggerName() {
+            state = 'letters';
+            const pts = getTextPoints("MARIAM");
+            const count = Math.min(pts.length, 3500);
+            particles = [];
+            
+            // Explode from center to letters
+            for(let i=0; i<count; i++) {
+                const p = pts[i];
+                const part = new Particle(width/2, height/2, colors.gold, p.x, p.y);
+                part.speed = 0.01 + Math.random() * 0.02;
+                particles.push(part);
+            }
+            
+            // Wait then transition to heart
+            setTimeout(() => {
+                state = 'morphing';
+                message.classList.add('visible');
+                
+                const heartPts = get3DHeartPoints(HEART_PARTICLE_COUNT);
+                
+                // Re-purpose existing particles
+                particles.forEach((p, i) => {
+                    const hp = heartPts[i % heartPts.length];
+                    p.resetTarget(hp.x, hp.y, hp.color, true);
+                });
+                
+                // Add remaining particles needed for the heart
+                for (let i = particles.length; i < HEART_PARTICLE_COUNT; i++) {
+                    const hp = heartPts[i];
+                    const p = new Particle(width/2, height/2, hp.color, hp.x, hp.y);
+                    p.speed = 0.01 + Math.random() * 0.01;
+                    particles.push(p);
+                }
+            }, 5000); 
+        }
+
+        // Interaction: Add particles on click/touch
+        function createBurst(x, y) {
+            for(let i=0; i<25; i++) {
+                const p = new Particle(x, y, colors.gold, x, y);
+                p.isFading = true;
+                p.vx = (Math.random() - 0.5) * 12;
+                p.vy = (Math.random() - 0.5) * 12;
+                p.radius = Math.random() * 2 + 1;
+                particles.push(p);
+            }
+        }
+
+        canvas.addEventListener('mousedown', (e) => createBurst(e.clientX, e.clientY));
+        canvas.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            createBurst(touch.clientX, touch.clientY);
+        });
+
+        function animate() {
+            // Semi-transparent clear for ghosting effect
+            ctx.fillStyle = '#050005';
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw Stars
+            stars.forEach(s => {
+                s.opacity += s.speed;
+                if(s.opacity > 1 || s.opacity < 0) s.speed *= -1;
+                ctx.fillStyle = `rgba(212, 175, 55, ${Math.max(0, s.opacity * 0.3)})`;
+                ctx.fillRect(s.x, s.y, s.size, s.size);
+            });
+            
+            let pulse = 1;
+            if (state === 'morphing') {
+                pulse = 1 + Math.sin(Date.now() * 0.002) * 0.05;
+            }
+
+            // Group by color to minimize fillStyle calls (performance)
+            const groups = {};
+            
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                if (!groups[p.color]) groups[p.color] = [];
+                
+                let dx = p.x;
+                let dy = p.y;
+
+                if (state === 'morphing' && !p.isFading) {
+                    const offsetX = p.x - width/2;
+                    const offsetY = p.y - (height/2 + 60);
+                    dx = width/2 + offsetX * pulse;
+                    dy = (height/2 + 60) + offsetY * pulse;
+                }
+                
+                groups[p.color].push({x: dx, y: dy, r: p.radius, a: p.alpha});
+            }
+
+            // Render groups
+            for (const color in groups) {
+                ctx.fillStyle = color;
+                const group = groups[color];
+                for (let j = 0; j < group.length; j++) {
+                    const p = group[j];
+                    ctx.globalAlpha = p.a;
+                    if (p.r < 1) {
+                        ctx.fillRect(p.x, p.y, 1.5, 1.5);
+                    } else {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+            ctx.globalAlpha = 1;
+
+            requestAnimationFrame(animate);
+        }
+
+        // Add trailing particles on mouse move
+        window.addEventListener('mousemove', (e) => {
+            if (state !== 'idle' && particles.length < 8000 && Math.random() > 0.5) {
+                const p = new Particle(e.clientX, e.clientY, colors.gold, e.clientX + (Math.random()-0.5)*20, e.clientY + (Math.random()-0.5)*20);
+                p.isFading = true;
+                p.alpha = 0.6;
+                p.radius = 0.8;
+                particles.push(p);
+            }
+        });
+    </script>
+</body>
+</html>
+
