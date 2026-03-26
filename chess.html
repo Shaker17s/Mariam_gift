@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legendary Chess</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+            padding: 20px 0;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .title {
+            background: linear-gradient(to right, #f6d365 0%, #fda085 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0px 4px 15px rgba(246, 211, 101, 0.2);
+        }
+
+        /* Customize chessboard to look more legendary */
+        .white-1e1d7 {
+            background-color: #f0d9b5;
+            color: #b58863;
+        }
+        .black-3c85d {
+            background-color: #b58863;
+            color: #f0d9b5;
+        }
+
+        .btn-legendary {
+            background: linear-gradient(45deg, #f6d365, #fda085);
+            border: none;
+            color: #2b1d0e;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-legendary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(246, 211, 101, 0.4);
+        }
+
+        .status-badge {
+            background: rgba(0, 0, 0, 0.4);
+            border-left: 4px solid #f6d365;
+        }
+
+        /* Custom scrollbar for PGN */
+        #pgn::-webkit-scrollbar {
+            width: 6px;
+        }
+        #pgn::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        #pgn::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+        }
+        #pgn::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.4);
+        }
+    </style>
+</head>
+<body>
+
+<div class="glass-panel p-6 md:p-10 w-full max-w-5xl mx-4 flex flex-col lg:flex-row gap-10 items-center">
+
+    <!-- Game Board Section -->
+    <div class="w-full lg:w-3/5 flex justify-center">
+        <div class="relative rounded-lg overflow-hidden shadow-[0_0_30px_rgba(246,211,101,0.2)]" style="padding: 12px; background: rgba(0,0,0,0.5); border: 2px solid rgba(246,211,101,0.3);">
+            <div id="board" style="width: 450px; max-width: 100%;"></div>
+        </div>
+    </div>
+
+    <!-- Info Section -->
+    <div class="w-full lg:w-2/5 flex flex-col justify-center text-white space-y-6">
+        <div class="text-center lg:text-left">
+            <h1 class="text-4xl lg:text-5xl font-extrabold title mb-3">Legendary Chess</h1>
+            <p class="text-gray-300 text-sm tracking-wide">A battle of minds, brought to life.</p>
+        </div>
+
+        <div class="status-badge p-4 rounded-r-lg">
+            <h3 class="text-gray-400 text-xs uppercase tracking-wider mb-1">Match Status</h3>
+            <div id="status" class="text-xl font-bold text-[#f6d365]">White to move</div>
+        </div>
+
+        <div class="flex gap-4 pt-2">
+            <button id="startBtn" class="btn-legendary px-6 py-3 rounded-lg flex-1 shadow-lg text-sm">New Game</button>
+            <button id="undoBtn" class="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-lg flex-1 transition-all border border-white/20 text-sm font-semibold">Undo Move</button>
+        </div>
+
+        <div class="mt-4 p-4 bg-black/40 rounded-lg border border-white/10">
+            <div class="flex justify-between items-center mb-2">
+                <h4 class="text-sm font-semibold text-gray-300">Match History:</h4>
+            </div>
+            <div class="text-xs text-gray-400">
+                <div id="pgn" class="font-mono mt-1 h-32 overflow-y-auto break-words bg-black/50 p-3 rounded leading-relaxed"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+<script>
+    var board = null;
+    var game = new Chess();
+    var $status = $('#status');
+    var $pgn = $('#pgn');
+
+    function onDragStart (source, piece, position, orientation) {
+        // do not pick up pieces if the game is over
+        if (game.game_over()) return false;
+
+        // only pick up pieces for the side to move
+        if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+            (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+            return false;
+        }
+    }
+
+    function onDrop (source, target) {
+        // see if the move is legal
+        var move = game.move({
+            from: source,
+            to: target,
+            promotion: 'q' // always promote to a queen for simplicity
+        });
+
+        // illegal move
+        if (move === null) return 'snapback';
+
+        updateStatus();
+    }
+
+    // update the board position after the piece snap
+    // for castling, en passant, pawn promotion
+    function onSnapEnd () {
+        board.position(game.fen());
+    }
+
+    function updateStatus () {
+        var statusHTML = '';
+
+        var moveColor = 'White';
+        if (game.turn() === 'b') {
+            moveColor = 'Black';
+        }
+
+        // checkmate?
+        if (game.in_checkmate()) {
+            statusHTML = 'Game over, ' + moveColor + ' is in checkmate.';
+        }
+        // draw?
+        else if (game.in_draw()) {
+            statusHTML = 'Game over, drawn position';
+        }
+        // game still on
+        else {
+            statusHTML = moveColor + ' to move';
+
+            // check?
+            if (game.in_check()) {
+                statusHTML += ', ' + moveColor + ' is in check';
+            }
+        }
+
+        $status.html(statusHTML);
+
+        var currentPgn = game.pgn();
+        $pgn.html(currentPgn ? currentPgn : "Waiting for first move...");
+
+        // Auto-scroll PGN to bottom
+        var pgnEl = document.getElementById('pgn');
+        pgnEl.scrollTop = pgnEl.scrollHeight;
+    }
+
+    var config = {
+        draggable: true,
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd,
+        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+    };
+
+    board = Chessboard('board', config);
+
+    // Resize board on window resize
+    $(window).resize(board.resize);
+
+    updateStatus();
+
+    $('#startBtn').on('click', function() {
+        game.reset();
+        board.start();
+        updateStatus();
+    });
+
+    $('#undoBtn').on('click', function() {
+        game.undo();
+        board.position(game.fen());
+        updateStatus();
+    });
+
+</script>
+
+</body>
+</html>
